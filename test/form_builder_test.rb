@@ -9,6 +9,12 @@ class FormBuilderTest < ActionView::TestCase
     end
   end
 
+  def with_custom_form_for(object, *args, &block)
+    with_concat_custom_form_for(object) do |f|
+      f.input(*args, &block)
+    end
+  end
+
   def with_button_for(object, *args)
     with_concat_form_for(object) do |f|
       f.button(*args)
@@ -70,11 +76,27 @@ class FormBuilderTest < ActionView::TestCase
     end
   end
 
+  test 'builder should allow adding custom input mappings for integer input types' do
+    swap SimpleForm, :input_mappings => { /lock_version/ => :hidden } do
+      with_form_for @user, :lock_version
+      assert_no_select 'form input#user_lock_version.integer'
+      assert_select 'form input#user_lock_version.hidden'
+    end
+  end
+
   test 'builder uses the first matching custom input map when more than one match' do
     swap SimpleForm, :input_mappings => { /count$/ => :integer, /^post_/ => :password } do
       with_form_for @user, :post_count
       assert_no_select 'form input#user_post_count.password'
       assert_select 'form input#user_post_count.numeric.integer'
+    end
+  end
+
+  test 'builder uses the custom map only for matched attributes' do
+    swap SimpleForm, :input_mappings => { /lock_version/ => :hidden } do
+      with_form_for @user, :post_count
+      assert_no_select 'form input#user_post_count.hidden'
+      assert_select 'form input#user_post_count.string'
     end
   end
 
@@ -582,5 +604,11 @@ class FormBuilderTest < ActionView::TestCase
 
     assert_select 'form ul', :count => 1
     assert_select 'form ul li', :count => 3
+  end
+
+  # CUSTOM FORM BUILDER
+  test 'custom builder should inherit mappings' do
+    with_custom_form_for @user, :email
+    assert_select 'form input[type=email]#user_email.custom'
   end
 end
